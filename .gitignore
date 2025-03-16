@@ -1,7 +1,4 @@
 */*checkpoint*
 *ipynb
 frame*
-lib/*-38*
-lib/__pycache__/daz_timeseries_lib.cpython-38.pyc
-lib/__pycache__/daz_iono_lib.cpython-38.pyc
-lib/__pycache__/daz_esd_lib.cpython-38.pyc
+notebooks/plotting_daz.py
