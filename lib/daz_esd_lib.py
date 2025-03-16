@@ -16,8 +16,12 @@ import requests
 from lxml import html
 warnings.filterwarnings("ignore")
 from osgeo import gdal
+from astropy.timeseries import LombScargle
+from scipy.optimize import curve_fit
 import geopandas as gpd
 gdal.UseExceptions()
+
+
 
 def results_files_process(filename, df, orbit):
     """
@@ -785,16 +789,54 @@ def df_get_itrf_gps_slopes(framespd, velnc='vel_gps_kreemer.nc', add_eu = True):
         framespd = framespd.rename({'ITRF_N':'ITRF_N_EUR', 'ITRF_E':'ITRF_E_EUR'})
     return framespd
 
+def seasonal_model(x, A, omega, phi, C):
+    """Sinusoidal seasonal model: A*sin(omega*x + phi) + C"""
+    return A * np.sin(omega * x + phi) + C
 
 ######Here is for illustration functions!
+def compute_trends(x, y, use_curve_fit=False):
+    """Compute trends using either linear regression or sinusoidal curve fitting."""
+    x = pd.to_numeric(x, errors='coerce').astype(float)
+    y = pd.to_numeric(y, errors='coerce').astype(float)
+
+    if y.isna().sum() > 0.5 * len(y):  # Ignore if more than 50% NaN values
+        return None, None
+
+    x = np.array(x).reshape(-1, 1)  # Reshape for sklearn
+    y = np.array(y)
+
+    if use_curve_fit:
+        # Initial guess for seasonal parameters: A (amplitude), omega (2pi/period), phi (phase shift), C (offset)
+        guess = [np.std(y), 2 * np.pi / 365, 0, np.mean(y)]
+        try:
+            params, _ = curve_fit(seasonal_model, x.flatten(), y, p0=guess, maxfev=10000)
+            y_fit = seasonal_model(x.flatten(), *params)
+        except RuntimeError:
+            y_fit = None  # In case curve fitting fails
+    else:
+        # Linear Trend (Linear Regression)
+        linreg = LinearRegression().fit(x, y)
+        y_fit = linreg.predict(x)
+
+    # Seasonal Trend (Lomb-Scargle)
+    frequency, power = LombScargle(x.flatten(), y).autopower(minimum_frequency=1/365, maximum_frequency=1/10)
+    seasonal_period = 1 / frequency[np.argmax(power)] if len(frequency) > 0 else None  # Period in days
+
+    return y_fit, seasonal_period
+
+
 
 def daz_plot_esd(df, frame='', epoch_col='epoch', daz_orig=None, daz_ion=None, daz_set=None, output_dir=None):
     """
-    Plots the DAZ values over time.
+    Plots the DAZ values over time with both seasonal and linear trends.
+
+    - Uses linear regression for daz_orig.
+    - Uses sinusoidal fitting (curve_fit) for daz_iono and daz_tide.
+    - Displays seasonal signal period (in days) in the legend.
 
     Parameters:
     df (pd.DataFrame): DataFrame containing the data.
-    frame (str): Frame identifier to be used as the image name.
+    frame (str): Frame identifier for saving output images.
     epoch_col (str): Name of the column containing epoch dates.
     daz_orig (str): Name of the column containing original DAZ values.
     daz_ion (str): Name of the column containing ionospheric corrected DAZ values.
@@ -804,53 +846,62 @@ def daz_plot_esd(df, frame='', epoch_col='epoch', daz_orig=None, daz_ion=None, d
 
     # Convert 'epoch' to datetime if it's not already
     df[epoch_col] = pd.to_datetime(df[epoch_col])
+    df["days_since_start"] = (df[epoch_col] - df[epoch_col].min()).dt.days  # Convert time to numerical format
+
+    # Ensure the columns exist
+    valid_cols = [col for col in [daz_orig, daz_ion, daz_set] if col in df.columns]
+    if not valid_cols:
+        print("Error: None of the specified DAZ columns exist in the dataset!")
+        print("Available columns:", df.columns)
+        return
 
     # Create the plot
-    fig = plt.figure(figsize=(10, 6))
-    
-    if daz_orig and daz_orig in df:
-        x = df[epoch_col]
-        y = df[daz_orig]
-        plt.scatter(x, y, label=daz_orig, color='blue')
-    
-    if daz_ion and daz_ion in df:
-        x = df[epoch_col]
-        y1 = df[daz_ion]
-        plt.scatter(x, y1, label=daz_ion, color='orange')
-        
-    if daz_set and daz_set in df:
-        x = df[epoch_col]
-        y2 = df[daz_set]
-        plt.scatter(x, y2, label=daz_set, color='green')
-        
-    plt.xlabel('Epoch')
-    plt.ylabel('daz [mm]')
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    colors = {"daz_bovl": "blue", "daz_iono_mm": "orange", "daz_tide_mm": "green"}
+    labels = {"daz_bovl": "Original DAZ", "daz_iono_mm": "CODE-GIM", "daz_tide_mm": "SET"}
+
+    for col, color in zip([daz_orig, daz_ion, daz_set], colors.values()):
+        if col and col in df:
+            x = df[epoch_col]
+            y = df[col]
+
+            # Use curve fitting for daz_iono and daz_tide, but linear fit for daz_orig
+            use_curve_fit = col in [daz_ion, daz_set]
+            y_fit, seasonal_period = compute_trends(df["days_since_start"], df[col], use_curve_fit=use_curve_fit)
+
+            # Scatter plot for raw data
+            ax.scatter(x, y, label=f"{labels[col]} (Seasonal: {seasonal_period:.1f} days)" if seasonal_period else labels[col], color=color, alpha=0.5)
+
+            # Plot fitted trend
+            if y_fit is not None:
+                ax.plot(x, y_fit, linestyle="--", color=color, label=f"{labels[col]} Trend (Curve Fit)" if use_curve_fit else f"{labels[col]} Trend (Linear)")
+
+    # Formatting the plot
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("DAZ [mm]")
+    ax.set_title("DAZ Trends with Seasonal and Linear Components")
+    ax.legend()
+    ax.grid(True)
 
     # Get the minimum and maximum dates from x
     min_date = df[epoch_col].min().date()
     max_date = df[epoch_col].max().date()
 
-    # Calculate the number of years between the minimum and maximum dates
-    num_years = max_date.year - min_date.year + 1
-
     # Set the x-axis tick locations and labels
     xticks = pd.date_range(start=min_date, end=max_date, freq='YS')  # Year start frequency
     xticks_labels = [date.strftime('%Y') for date in xticks]
-
     plt.xticks(xticks, xticks_labels, rotation='vertical')
 
     # Optionally, save the plot
     if output_dir is not None:
         os.makedirs(output_dir, exist_ok=True)
         filename = os.path.join(output_dir, f'{frame}.jpg')
-        plt.savefig(filename)
+        plt.savefig(filename, dpi=300)
         print(f"Plot saved to {filename}")
 
-    # Display the plot
-    plt.legend()
     plt.show()
-
-
+    
 
 def daz_plotting_point_pygmt(asc_gnss_file, dem_file, esd_step5_file, frame_step5_file, data_dir='daz_esd', region=[65, 95, 30, 50], dem_resolution='15s'):
     '''

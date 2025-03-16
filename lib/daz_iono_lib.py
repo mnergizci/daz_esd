@@ -525,7 +525,7 @@ def calculate_daz_iono(bovl, esds, framespd, method = 'gradient', out_hionos = F
         #
     ############## now calculate TEC using the SLM knowledge, i.e. different A,B per epoch (!)
     # (note that the last hiono is for the master/reference epoch
-    print('iri calculated correctly!')
+    # print('iri calculated correctly!')
     tecs_A = []
     tecs_B = []
     #for hiono in hionos:

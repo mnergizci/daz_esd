@@ -44,7 +44,7 @@ def main(argv=None):
         argv = sys.argv
     
     #%% Set default
-    ionosource = 'iri'
+    ionosource = 'code'
 
     #%% Read options
     try:

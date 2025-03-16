@@ -41,7 +41,7 @@ def main():
                 print(f'Frame {i+1}/{len(lines)}: {frame} processing!')
                 print('step1!')
                 # Define the command to run the Python script with the frame as an argument
-                command = f"python daz_esd_01_prepare_input.py {frame} --orbdiff_fix --daz_wrt"
+                command = f"daz_esd_01_prepare_input.py {frame} --orbdiff_fix --daz_wrt"
     
                 # Execute the command
                 os.system(command)
@@ -59,7 +59,7 @@ def main():
             if not os.path.exists(os.path.join(datadir,frame_step2_file)):
                 print(f'{frame} step2 processing!')
                 # Define the command to run the second Python script with the necessary arguments
-                command = f"python daz_esd_02_extract_SET.py {frame_step1_file} {frame_earthtides_file} {frame_step2_file}"
+                command = f"daz_esd_02_extract_SET.py {frame_step1_file} {frame_earthtides_file} {frame_step2_file}"
                 # Execute the command
                 os.system(command)
             elif not os.path.exists(os.path.join(datadir,frame_earthtides_file)):
@@ -80,7 +80,7 @@ def main():
             if not os.path.exists(os.path.join(datadir,frame_step3_file)):
                 print(f'{frame} step3 processing!')
                 # Define the command to run the third Python script with the necessary arguments
-                command = f"python daz_esd_03_extract_iono.py {frame_step2_file} {frame_step3_file}"
+                command = f"daz_esd_03_extract_iono.py {frame_step2_file} {frame_step3_file}"
                 os.system(command)
                 print("Third round of processing complete.")
             else:
@@ -100,9 +100,9 @@ def main():
             if not os.path.exists(os.path.join(datadir,frame_step4_frame_file)):
                 if args.add_eu:
                     print('add_eu active')
-                    command = f'python daz_esd_04_extract_PMM.py {frame_step3_frame_file} {frame_step4_frame_file} {nc_file} --add_eu'
+                    command = f'daz_esd_04_extract_PMM.py {frame_step3_frame_file} {frame_step4_frame_file} {nc_file} --add_eu'
                 else:
-                    command = f'python daz_esd_04_extract_PMM.py {frame_step3_frame_file} {frame_step4_frame_file} {nc_file}'
+                    command = f'daz_esd_04_extract_PMM.py {frame_step3_frame_file} {frame_step4_frame_file} {nc_file}'
                     print('no add_eu')
                 # Execute the command
                 os.system(command)
@@ -122,14 +122,14 @@ def main():
     
             if not os.path.exists(os.path.join(datadir,frame_step5_file)) or not os.path.exists(os.path.join(datadir,frame_step5_frame_file)):
                 if args.s1ab and args.roll_assist:
-                    command= command= f'python daz_esd_05_calculate_slop.py {frame_step3_file} {frame_step4_frame_file} {frame_step5_file} {frame_step5_frame_file} --s1ab --roll_assist'
+                    command= command= f'daz_esd_05_calculate_slop.py {frame_step3_file} {frame_step4_frame_file} {frame_step5_file} {frame_step5_frame_file} --s1ab --roll_assist'
                 elif args.s1ab:
                     print('s1ab offset active')
-                    command= f'python daz_esd_05_calculate_slop.py {frame_step3_file} {frame_step4_frame_file} {frame_step5_file} {frame_step5_frame_file} --s1ab'
+                    command= f'daz_esd_05_calculate_slop.py {frame_step3_file} {frame_step4_frame_file} {frame_step5_file} {frame_step5_frame_file} --s1ab'
                 elif args.roll_assist:
-                    command= f'python daz_esd_05_calculate_slop.py {frame_step3_file} {frame_step4_frame_file} {frame_step5_file} {frame_step5_frame_file} --roll_assist'
+                    command= f'daz_esd_05_calculate_slop.py {frame_step3_file} {frame_step4_frame_file} {frame_step5_file} {frame_step5_frame_file} --roll_assist'
                 else:
-                    command= f'python daz_esd_05_calculate_slop.py {frame_step3_file} {frame_step4_frame_file} {frame_step5_file} {frame_step5_frame_file}'
+                    command= f'daz_esd_05_calculate_slop.py {frame_step3_file} {frame_step4_frame_file} {frame_step5_file} {frame_step5_frame_file}'
             
                 # Execute the command
                 os.system(command)

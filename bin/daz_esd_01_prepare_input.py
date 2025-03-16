@@ -301,8 +301,8 @@ def process_data(frame, daz_wrt, orbdiff_fix):
     df_angle = df_angle.apply(lambda x: x.round(8) if x.dtype.kind in 'fc' else x)
     # Set pandas display option to show floats with 8 decimal places
     pd.options.display.float_format = '{:.8f}'.format
-    
-    df_angle.drop(columns=['daz_total_wrt_orbits'], inplace=True)
+    # if daz_wrt:
+    #     df_angle.drop(columns=['daz_total_wrt_orbits'], inplace=True)
     # Saving the DataFrame to CSV
     os.chdir(homedir)
     output_dir = os.path.join(batchdir, 'daz_esd')
